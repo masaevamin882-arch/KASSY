@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Kayaşehir Terminal Pro</title>
+    <style>
+        :root {
+            --pos-blue: #004b8d;
+            --btn-orange: #f39c12;
+            --btn-green: #27ae60;
+            --btn-red: #e74c3c;
+            --btn-dark: #34495e;
+        }
+
+        body {
+            background-color: #2c3e50;
+            font-family: 'Segoe UI', sans-serif;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: white;
+            overflow: hidden;
+        }
+
+        /* Экран входа */
+        #loginScreen {
+            position: fixed;
+            inset: 0;
+            background: #1a1a1a;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        /* Основной интерфейс */
+        .pos-app {
+            display: none;
+            width: 1280px;
+            height: 850px;
+            background: var(--pos-blue);
+            border: 10px solid #222;
+            border-radius: 15px;
+            flex-direction: column;
+            padding: 15px;
+        }
+
+        .top-nav {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            align-items: center;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 380px 1fr 300px;
+            gap: 15px;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Чек и История */
+        .receipt-area {
+            background: white;
+            color: black;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+        }
+
+        .receipt-items { flex: 1; overflow-y: auto; font-family: monospace; font-size: 14px; }
+
+        .history-area {
+            display: none;
+            position: fixed;
+            top: 10%; left: 10%; width: 80%; height: 80%;
+            background: #fff; color: #000;
+            z-index: 600; border-radius: 15px; padding: 20px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+
+        /* Кубики */
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            grid-auto-rows: 130px;
+            gap: 10px;
+            overflow-y: auto;
+            padding: 10px;
+        }
+
+        .product-cube {
+            background: var(--btn-orange);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            font-weight: bold;
+            border: 2px solid white;
+        }
+
+        /* Панели */
+        .side-panel { display: flex; flex-direction: column; gap: 10px; }
+        .panel-block { background: rgba(0,0,0,0.4); padding: 12px; border-radius: 8px; }
+        
+        input { width: 90%; padding: 8px; margin-bottom: 5px; border-radius: 4px; border: none; }
+        button { cursor: pointer; border: none; border-radius: 5px; font-weight: bold; }
+        
+        .btn-green { background: var(--btn-green); color: white; width: 100%; padding: 10px; }
+        .btn-red { background: var(--btn-red); color: white; }
+        .total-banner { background: var(--btn-red); color: white; font-size: 30px; padding: 15px; text-align: right; margin-top: 5px; }
+
+        .modal {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.9); justify-content: center; align-items: center; z-index: 700;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ВХОД -->
+<div id="loginScreen">
+    <div style="background:#333; padding:40px; border-radius:15px; text-align:center">
+        <h2>Kayaşehir Terminal</h2>
+        <input type="password" id="pass" placeholder="Пароль 1234" style="text-align:center; font-size:20px">
+        <br><br>
+        <button onclick="login()" class="btn-green">ВОЙТИ В СИСТЕМУ</button>
+    </div>
+</div>
+
+<!-- КАССА -->
+<div class="pos-app" id="pos">
+    <div class="top-nav">
+        <button onclick="logout()" class="btn-red" style="padding:10px 20px">ВЫКЛЮЧИТЬ</button>
+        <button onclick="showHistory()" style="background:#3498db; color:white; padding:10px 20px">РАЗДЕЛ ЧЕКИ</button>
+        <button onclick="showModal('debtModal')" style="background:#9b59b6; color:white; padding:10px 20px">ДОЛГИ</button>
+        <div style="flex:1"></div>
+        <div id="multDisplay" style="font-size:24px; background:#000; padding:5px 15px">X1</div>
+    </div>
+
+    <div class="main-grid">
+        <div class="receipt-area">
+            <h3 style="margin:0 0 10px 0; border-bottom:1px solid #333">ТЕКУЩИЙ ЧЕК</h3>
+            <div class="receipt-items" id="receipt"></div>
+            <div class="total-banner" id="total">0.00 ₺</div>
+            <button onclick="clearCart()" style="margin-top:10px">ОТМЕНА</button>
+        </div>
+
+        <div class="products-grid" id="cubes"></div>
+
+        <div class="side-panel">
+            <div class="panel-block">
+                <h4>ДОБАВИТЬ КУБИК</h4>
+                <input type="text" id="newN" placeholder="Название">
+                <input type="number" id="newP" placeholder="Цена ₺">
+                <button onclick="createCube()" class="btn-green">СОЗДАТЬ</button>
+            </div>
+
+            <div class="panel-block">
+                <h4>НАЛИЧНЫЕ</h4>
+                <input type="number" id="cashIn" placeholder="Взял денег" oninput="calcChange()">
+                <div style="font-size:14px">Сдача: <span id="changeDisplay" style="color:#2ecc71; font-weight:bold">0.00</span> ₺</div>
+                <button onclick="payCash()" style="background:#2980b9; color:white; width:100%; margin-top:10px; padding:10px">ОПЛАТИТЬ</button>
+            </div>
+
+            <div class="panel-block" style="display:grid; grid-template-columns:1fr 1fr; gap:5px">
+                <button onclick="setMult(1)">1X</button>
+                <button onclick="setMult(2)">2X</button>
+                <button onclick="setMult(3)">3X</button>
+                <button onclick="setMult(5)">5X</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ИСТОРИЯ ЧЕКОВ -->
+<div id="historyBox" class="history-area">
+    <div style="display:flex; justify-content:space-between">
+        <h2>АРХИВ ЧЕКОВ</h2>
+        <button onclick="hideHistory()" class="btn-red" style="padding:5px 15px">ЗАКРЫТЬ</button>
+    </div>
+    <hr>
+    <div id="historyList" style="overflow-y:auto; height:90%"></div>
+</div>
+
+<!-- КАРТА -->
+<div id="cardModal" class="modal">
+    <div style="background:#fff; color:#000; padding:30px; border-radius:15px; text-align:center">
+        <h3>ОПЛАТА КАРТОЙ</h3>
+        <p>Итого: <span id="cardTotal">0</span> ₺</p>
+        <input type="number" id="cardNum" placeholder="Номер (1-Да, 2-Нет)">
+        <br><br>
+        <button onclick="processCard()" class="btn-green">ПОДТВЕРДИТЬ</button>
+        <button onclick="hideModal('cardModal')">ОТМЕНА</button>
+    </div>
+</div>
+
+<!-- ДОЛГИ -->
+<div id="debtModal" class="modal">
+    <div style="background:#fff; color:#000; padding:30px; border-radius:15px; text-align:center; width:350px">
+        <h3>ДОЛЖНИКИ</h3>
+        <input type="text" id="dN" placeholder="Имя">
+        <input type="number" id="dA" placeholder="₺">
+        <button onclick="addDebt()" class="btn-green">ЗАПИСАТЬ</button>
+        <div id="debtList" style="text-align:left; margin-top:10px"></div>
+        <button onclick="hideModal('debtModal')" style="margin-top:10px">ЗАКРЫТЬ</button>
+    </div>
+</div>
+
+<script>
+    let total = 0;
+    let multiplier = 1;
+    let history = [];
+
+    function login() {
+        if(document.getElementById('pass').value === '1234') {
+            document.getElementById('loginScreen').style.display = 'none';
+            document.getElementById('pos').style.display = 'flex';
+        } else { alert('Ошибка!'); }
+    }
+
+    function logout() {
+        if(confirm("Выключить кассу и завершить смену?")) {
+            document.getElementById('pos').style.display = 'none';
+            document.getElementById('loginScreen').style.display = 'flex';
+            document.getElementById('pass').value = '';
+        }
+    }
+
+    function createCube() {
+        const n = document.getElementById('newN').value;
+        const p = document.getElementById('newP').value;
+        if(!n || !p) return;
+        const cube = document.createElement('div');
+        cube.className = 'product-cube';
+        cube.innerHTML = `${n}<br>${p} ₺ <div style="position:absolute; top:2px; right:5px" onclick="this.parentElement.remove(); event.stopPropagation();">✕</div>`;
+        cube.onclick = () => addToCart(n, parseFloat(p));
+        document.getElementById('cubes').appendChild(cube);
+    }
+
+    function addToCart(name, price) {
+        const sum = price * multiplier;
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.justifyContent = 'space-between';
+        row.style.padding = '5px 0';
+        row.dataset.price = sum;
+        row.innerHTML = `<span>${multiplier}x ${name}</span> <span>${sum.toFixed(2)} ₺</span>`;
+        row.onclick = function() { total -= parseFloat(this.dataset.price); this.remove(); updateTotal(); };
+        document.getElementById('receipt').appendChild(row);
+        total += sum;
+        updateTotal();
+        setMult(1);
+    }
+
+    function updateTotal() { document.getElementById('total').innerText = total.toFixed(2) + ' ₺'; calcChange(); }
+
+    function calcChange() {
+        const cash = parseFloat(document.getElementById('cashIn').value) || 0;
+        document.getElementById('changeDisplay').innerText = (cash > total ? cash - total : 0).toFixed(2);
+    }
+
+    function saveReceipt(type) {
+        const items = document.getElementById('receipt').innerHTML;
+        const date = new Date().toLocaleTimeString();
+        history.push({ date, items, total: total.toFixed(2), type });
+    }
+
+    function payCash() {
+        const cash = parseFloat(document.getElementById('cashIn').value) || 0;
+        if(total > 0 && cash >= total) {
+            alert("Оплачено! Сдача: " + (cash-total).toFixed(2) + " ₺");
+            saveReceipt("Наличные");
+            clearCart();
+            document.getElementById('cashIn').value = '';
+        }
+    }
+
+    function showHistory() {
+        const list = document.getElementById('historyList');
+        list.innerHTML = history.map(h => `
+            <div style="border:1px solid #ccc; padding:10px; margin-bottom:10px; font-family:monospace">
+                <b>ВРЕМЯ: ${h.date} | ТИП: ${h.type}</b><br>${h.items}
+                <hr><b>ИТОГО: ${h.total} ₺</b>
+            </div>
+        `).join('');
+        document.getElementById('historyBox').style.display = 'block';
+    }
+
+    function hideHistory() { document.getElementById('historyBox').style.display = 'none'; }
+    function setMult(x) { multiplier = x; document.getElementById('multDisplay').innerText = 'X' + x; }
+    function clearCart() { document.getElementById('receipt').innerHTML = ''; total = 0; updateTotal(); }
+    function showModal(id) { document.getElementById(id).style.display = 'flex'; }
+    function hideModal(id) { document.getElementById(id).style.display = 'none'; }
+    
+    function addDebt() {
+        const n = document.getElementById('dN').value;
+        const a = document.getElementById('dA').value;
+        if(n && a) {
+            document.getElementById('debtList').innerHTML += `<div>• ${n}: ${a} ₺ <button onclick="this.parentElement.remove()">X</button></div>`;
+        }
+    }
+</script>
+
+</body>
+</html>
